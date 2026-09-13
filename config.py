@@ -10,6 +10,9 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
+# Scraping rate limit / pacing settings
+REQUEST_DELAY_SECONDS = float(os.environ.get("REQUEST_DELAY_SECONDS", "1.5"))
+
 # SMTP Configuration
 SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
@@ -23,9 +26,9 @@ EMAIL_TO = os.environ.get("EMAIL_TO", "")  # Can be comma-separated list
 # Deal Analyzer Configuration
 MIN_DISCOUNT_PERCENT = int(os.environ.get("MIN_DISCOUNT_PERCENT", "20"))
 MIN_PRICE_DROP_ARS = float(os.environ.get("MIN_PRICE_DROP_ARS", "500"))
+MIN_COMPETITOR_DISCOUNT_PERCENT = float(os.environ.get("MIN_COMPETITOR_DISCOUNT_PERCENT", "10.0"))
 
 # Filtering configuration (comma-separated strings)
 # Ejemplo: INCLUDE_KEYWORDS = "monitor,lg" (solo incluirá productos que contengan monitor O lg)
 INCLUDE_KEYWORDS = os.environ.get("INCLUDE_KEYWORDS", "")
 EXCLUDE_KEYWORDS = os.environ.get("EXCLUDE_KEYWORDS", "switch")
-

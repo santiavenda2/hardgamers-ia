@@ -13,7 +13,8 @@ A diferencia de un scraper tradicional que solo extrae datos de la sección de d
 2. **Filtra** por umbrales de descuento, caída de precio y palabras clave.
 3. **Valida contra la competencia**: Busca el mismo producto en otras tiendas en HardGamers mediante búsqueda difusa y comprueba si realmente es el precio más bajo del mercado.
 4. **Audita el historial de precios (30 días)**: Extrae el histórico embebido (`chartConfig`) en la ficha del producto para comprobar si hubo una suba artificial previa de precio (descuentos falsos) y calcular el ahorro real frente al promedio de 30 días.
-5. **Notifica**: Genera un reporte HTML responsivo y lo envía automáticamente por correo vía SMTP (o lo muestra en consola en modo dry-run).
+5. **Audita y categoriza artículos rechazados**: Recopila todas las publicaciones descartadas detallando la causa exacta de descarte (descuento insuficiente, palabras clave excluidas, ausencia de palabras clave requeridas, o exceso de cupo de validación).
+6. **Notifica**: Genera un reporte HTML responsivo (incluyendo ofertas validadas y el listado de rechazados) y lo envía automáticamente por correo vía SMTP (o lo muestra en consola en modo dry-run).
 
 ---
 
@@ -23,7 +24,7 @@ A diferencia de un scraper tradicional que solo extrae datos de la sección de d
 hardgamers-ia/
 ├── main.py                   # Orquestador del flujo CLI (entrypoint)
 ├── scraper.py                # Peticiones HTTP, parsing HTML, regex y scraping de historial
-├── analyzer.py               # Lógica de filtrado, multithreading, matching de mercado y ordenamiento
+├── analyzer.py               # Lógica de filtrado, multithreading, matching de mercado, tracking de rechazados y ordenamiento
 ├── notifier.py               # Generación de plantilla HTML y envío SMTP
 ├── config.py                 # Variables de entorno y configuraciones globales
 ├── test_product_history.py   # Script de testing para inspección de scripts/DOM
@@ -39,6 +40,10 @@ hardgamers-ia/
   - *Validación de mercado*: `similar_found`, `competitors` (lista de tiendas/precios), `min_competitor_price`, `market_discount_percent`, `is_truly_cheaper`
   - *Historial de precios*: `history` (instancia de `PriceHistory`)
 
+- **`RejectedDeal`**: Representa un artículo analizado que no superó los filtros:
+  - `deal`: Instancia de `Deal`.
+  - `reason`: Razón explícita del descarte (e.g., `Palabra clave excluida`, `Descuento insuficiente`, `Supera el cupo de validación profunda`).
+
 - **`PriceHistory`**: Métricas calculadas del historial de 30 días:
   - `days_count`: Cantidad de días registrados.
   - `avg_price`, `min_price`, `max_price`: Estadísticas previas a la oferta.
@@ -53,14 +58,15 @@ hardgamers-ia/
 ```mermaid
 flowchart TD
     A["main.py (CLI Args)"] --> B["scraper.fetch_all_deals()"]
-    B --> C["analyzer.filter_deals() (Filtro Básico + Keywords)"]
-    C --> D["ThreadPoolExecutor (analyzer.validate_single_deal)"]
-    D --> E["scraper.search_competitors() (Fuzzy Search en HardGamers)"]
+    B --> C["analyzer.filter_deals()"]
+    C -->|Accepted Candidates| D["ThreadPoolExecutor (analyzer.validate_single_deal)"]
+    C -->|Rejected Items with Reasons| R["Lista RejectedDeal"]
+    D --> E["scraper.search_competitors() (Fuzzy Search)"]
     D --> F["scraper.fetch_price_history() (Parsing chartConfig 30d)"]
-    E & F --> G["analyzer.sort_deals() (discount, market_discount, etc.)"]
-    G --> H["Salida Consola (Resumen detallado)"]
-    G --> I{"--no-email activado?"}
-    I -- No --> J["notifier.send_email_alert() (SMTP HTML Report)"]
+    E & F --> G["analyzer.sort_deals()"]
+    G & R --> H["Salida Consola (Resumen de Aceptados + Listado de Rechazados)"]
+    G & R --> I{"--no-email activado?"}
+    I -- No --> J["notifier.send_email_alert() (HTML con Ofertas y Tabla de Rechazados)"]
     I -- Sí --> K["Fin del proceso (Dry-run)"]
 ```
 
@@ -71,7 +77,7 @@ flowchart TD
 ### A. Control de Rate Limiting (HTTP 429)
 HardGamers aplica limitación de tasa ante ráfagas de consultas a `/search` y fichas de productos. El agente implementa:
 1. **Sesión HTTP Reutilizable con `urllib3.util.Retry`**: Reintentos automáticos con backoff exponencial para códigos 429, 500, 502, 503, 504 (`scraper.create_session()`).
-2. **Priorización antes de validar (`max_deals_to_validate`)**: Solo se valida a fondo el top N de candidatos (por defecto 15) que hayan pasado el primer filtro de descuento.
+2. **Priorización antes de validar (`max_deals_to_validate`)**: Solo se valida a fondo el top N de candidatos (por defecto 15) que hayan pasado el primer filtro de descuento. Los restantes se marcan como rechazados por cupo.
 3. **Pausas (`sleep`) y concurrencia controlada**: `ThreadPoolExecutor` con máximo 3 workers y pausas breves para no saturar la API.
 
 ### B. Búsqueda y Comparación de Competidores (`search_competitors`)

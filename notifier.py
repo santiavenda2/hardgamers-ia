@@ -2,44 +2,54 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import logging
-from typing import List
-from scraper import Deal
+from typing import List, Optional
+from scraper import Deal, RejectedDeal
 import config
 
 logger = logging.getLogger(__name__)
 
-def generate_html_email(deals: List[Deal]) -> str:
-    """Generate a clean, responsive HTML email body with the list of deals, market comparison & 30-day history."""
+def generate_html_email(deals: List[Deal], rejected_deals: Optional[List[RejectedDeal]] = None) -> str:
+    """Generate a clean, responsive HTML email body with the list of deals, market comparison, 30-day history & rejected items."""
     deals_html = ""
     for deal in deals:
         prev_price_html = f"<span class='old-price'>${deal.previous_price:,.2f}</span>" if deal.previous_price else ""
         discount_badge = f"<span class='badge'>{deal.discount_percent}% OFF</span>" if deal.discount_percent else ""
         image_html = f"<img src='{deal.image_url}' alt='{deal.title}' class='deal-img'>" if deal.image_url else ""
         
+        search_link_html = ""
+        if deal.competitor_search_url:
+            search_link_html = f"<div style='font-size: 11px; color: #6c757d; margin-bottom: 4px;'>🔍 <a href='{deal.competitor_search_url}' target='_blank' style='color: #0366d6; text-decoration: underline;'>Endpoint Búsqueda HardGamers</a> (<em>'{deal.search_keywords}'</em>)</div>"
+
         # Competitor validation block
         if deal.similar_found and deal.competitors:
             best_comp = deal.competitors[0]
+            comp_link_tag = f"<a href='{best_comp['link']}' target='_blank' style='color: inherit; text-decoration: underline; font-weight: bold;'>{best_comp['store']}</a>" if best_comp.get('link') else f"<strong>{best_comp['store']}</strong>"
+
             if deal.is_truly_cheaper and deal.market_discount_percent and deal.market_discount_percent > 0:
                 market_html = f"""
                 <div class='market-comparison market-cheaper'>
-                    ✅ <strong>¡Más barato que la competencia!</strong> {deal.market_discount_percent}% menos que <strong>{best_comp['store']}</strong> (${best_comp['price']:,.2f})
+                    {search_link_html}
+                    ✅ <strong>¡Más barato que la competencia!</strong> {deal.market_discount_percent}% menos que {comp_link_tag} (${best_comp['price']:,.2f})
                 </div>
                 """
             elif deal.market_discount_percent is not None and deal.market_discount_percent <= 0:
                 market_html = f"""
                 <div class='market-comparison market-warning'>
-                    ⚠️ Encontrado más barato o igual en <strong>{best_comp['store']}</strong> (${best_comp['price']:,.2f})
+                    {search_link_html}
+                    ⚠️ Encontrado más barato o igual en {comp_link_tag} (${best_comp['price']:,.2f})
                 </div>
                 """
             else:
                 market_html = f"""
                 <div class='market-comparison'>
-                    📊 Competidor más cercano: <strong>{best_comp['store']}</strong> (${best_comp['price']:,.2f})
+                    {search_link_html}
+                    📊 Competidor más cercano: {comp_link_tag} (${best_comp['price']:,.2f})
                 </div>
                 """
         else:
-            market_html = """
+            market_html = f"""
             <div class='market-comparison market-neutral'>
+                {search_link_html}
                 ℹ️ <em>Sin productos similares encontrados en otras tiendas</em>
             </div>
             """
@@ -73,6 +83,56 @@ def generate_html_email(deals: List[Deal]) -> str:
         </div>
         """
 
+    # Rejected items section
+    rejected_html = ""
+    if rejected_deals:
+        rows_html = ""
+        for item in rejected_deals:
+            d = item.deal
+            price_text = f"${d.current_price:,.2f}" if d.current_price else "N/A"
+            disc_text = f" <span style='color: #888;'>({d.discount_percent}% OFF)</span>" if d.discount_percent else ""
+            link_start = f"<a href='{d.product_link}' target='_blank' style='color: #495057; text-decoration: none; font-weight: 500;'>" if d.product_link else ""
+            link_end = "</a>" if d.product_link else ""
+
+            # Convert plain URLs in reason to links if present
+            reason_text = item.reason
+
+            rows_html += f"""
+            <tr>
+                <td style="padding: 8px 10px; border-bottom: 1px solid #e9ecef; vertical-align: top;">
+                    <div style="font-weight: bold; color: #2c3e50; font-size: 11px;">{d.store}</div>
+                    <div style="color: #28a745; font-size: 12px; font-weight: 600;">{price_text}{disc_text}</div>
+                </td>
+                <td style="padding: 8px 10px; border-bottom: 1px solid #e9ecef; vertical-align: top; font-size: 12px;">
+                    {link_start}{d.title}{link_end}
+                </td>
+                <td style="padding: 8px 10px; border-bottom: 1px solid #e9ecef; vertical-align: top;">
+                    <span class="reject-tag" style="word-break: break-all;">{reason_text}</span>
+                </td>
+            </tr>
+            """
+
+        rejected_html = f"""
+        <div class="rejected-wrapper">
+            <div class="rejected-header">
+                <h3>🚫 Artículos Analizados y Rechazados ({len(rejected_deals)})</h3>
+                <p style="margin: 4px 0 0 0; color: #6c757d; font-size: 12px;">Listado de publicaciones evaluadas que no cumplieron los criterios de selección.</p>
+            </div>
+            <table class="rejected-table">
+                <thead>
+                    <tr>
+                        <th style="width: 25%;">Tienda / Precio</th>
+                        <th style="width: 45%;">Producto</th>
+                        <th style="width: 30%;">Causa de Rechazo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows_html}
+                </tbody>
+            </table>
+        </div>
+        """
+
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -87,7 +147,7 @@ def generate_html_email(deals: List[Deal]) -> str:
                 padding: 0;
             }}
             .email-wrapper {{
-                max-width: 650px;
+                max-width: 680px;
                 margin: 0 auto;
                 background-color: #ffffff;
                 padding: 20px;
@@ -199,6 +259,44 @@ def generate_html_email(deals: List[Deal]) -> str:
                 border-radius: 4px;
                 color: #495057;
             }}
+            .rejected-wrapper {{
+                margin-top: 25px;
+                border-top: 2px dashed #e1e4e8;
+                padding-top: 15px;
+            }}
+            .rejected-header h3 {{
+                font-size: 15px;
+                color: #495057;
+                margin: 0;
+            }}
+            .rejected-table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+                font-size: 12px;
+            }}
+            .rejected-table th {{
+                background-color: #f8f9fa;
+                color: #495057;
+                text-align: left;
+                padding: 7px 10px;
+                border-bottom: 2px solid #dee2e6;
+                font-size: 11px;
+                text-transform: uppercase;
+            }}
+            .rejected-table tr:nth-child(even) {{
+                background-color: #fafbfc;
+            }}
+            .reject-tag {{
+                display: inline-block;
+                background-color: #fff5f5;
+                color: #c53030;
+                border: 1px solid #feb2b2;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 11px;
+                font-weight: 500;
+            }}
             .footer {{
                 text-align: center;
                 font-size: 12px;
@@ -216,8 +314,9 @@ def generate_html_email(deals: List[Deal]) -> str:
                 <p style="margin: 5px 0 0 0; color: #6c757d; font-size: 14px;">Reporte diario de ofertas con validación de precios frente a la competencia e historial de 30 días.</p>
             </div>
             <div class="deals-list">
-                {deals_html}
+                {deals_html if deals else "<p style='text-align: center; color: #6c757d;'>No se encontraron ofertas que superen los filtros seleccionados.</p>"}
             </div>
+            {rejected_html}
             <div class="footer">
                 <p>Automated HardGamers Deal Alert Agent. Happy Gaming!</p>
             </div>
@@ -227,18 +326,19 @@ def generate_html_email(deals: List[Deal]) -> str:
     """
     return html_content
 
-def send_email_alert(deals: List[Deal]) -> bool:
-    """Send the email alert with the given deals via SMTP."""
-    if not deals:
-        logger.info("No deals to send via email.")
+def send_email_alert(deals: List[Deal], rejected_deals: Optional[List[RejectedDeal]] = None) -> bool:
+    """Send the email alert with the given deals and rejected items via SMTP."""
+    if not deals and not rejected_deals:
+        logger.info("No deals or rejected items to send via email.")
         return True
 
     if not config.SMTP_USER or not config.SMTP_PASSWORD or not config.EMAIL_TO:
         logger.warning("SMTP credentials or recipient email are not configured. Skipping email send.")
         return False
 
-    subject = f"🔥 HardGamers Alert: {len(deals)} Ofertas Verificadas!"
-    html_body = generate_html_email(deals)
+    deals_count_str = f"{len(deals)} Ofertas Verificadas" if deals else "Reporte de Análisis"
+    subject = f"🔥 HardGamers Alert: {deals_count_str}!"
+    html_body = generate_html_email(deals, rejected_deals=rejected_deals)
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject

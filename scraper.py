@@ -1,36 +1,134 @@
-from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+import json
 import logging
+import re
+import time
+import urllib.parse
+from dataclasses import dataclass, field
+from difflib import SequenceMatcher
+from typing import List, Optional, Dict, Any
+
 import requests
+from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
-from bs4 import BeautifulSoup
-from typing import List, Optional, Dict, Any
-import urllib.parse
-import re
-from difflib import SequenceMatcher
-import time
-import json
+
+import config
 
 logger = logging.getLogger(__name__)
 
+_last_ratelimit_reset: Optional[float] = None
+
 def create_session() -> requests.Session:
-    """Creates a requests session with automatic retry on 429 and transient errors."""
+    """Creates a requests session with automatic retry on transient server errors."""
     session = requests.Session()
     retries = Retry(
         total=2,
         backoff_factor=1.0,
-        status_forcelist=[429, 500, 502, 503, 504],
+        status_forcelist=[500, 502, 503, 504],
         raise_on_status=False
     )
     adapter = HTTPAdapter(max_retries=retries)
     session.mount("https://", adapter)
     session.mount("http://", adapter)
-    session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    })
+    session.headers.update(config.HEADERS)
     return session
 
 _shared_session = create_session()
+
+def extract_wait_time_from_response(response: requests.Response, default_wait: float = 60.0) -> float:
+    """
+    Extract the rate limit wait time in seconds from a 429 response.
+    Checks 'Retry-After' header, 'X-Ratelimit-Reset' header, and recent session reset info.
+    """
+    global _last_ratelimit_reset
+
+    # 1. Check 'Retry-After' header (standard RFC header, e.g. '60' or HTTP Date)
+    retry_after = response.headers.get("Retry-After")
+    if retry_after:
+        try:
+            return max(1.0, float(retry_after))
+        except ValueError:
+            try:
+                dt = parsedate_to_datetime(retry_after)
+                now = datetime.now(timezone.utc)
+                diff = (dt - now).total_seconds()
+                if diff > 0:
+                    return max(1.0, diff)
+            except Exception:
+                pass
+
+    # 2. Check 'X-Ratelimit-Reset' header (epoch timestamp)
+    reset_header = response.headers.get("X-Ratelimit-Reset")
+    if reset_header:
+        try:
+            reset_ts = float(reset_header)
+            now_ts = time.time()
+            if reset_ts > now_ts:
+                return max(1.0, (reset_ts - now_ts) + 1.0)
+        except ValueError:
+            pass
+
+    # 3. Check previously cached reset timestamp from earlier 200 responses
+    if _last_ratelimit_reset is not None:
+        now_ts = time.time()
+        if _last_ratelimit_reset > now_ts:
+            return max(1.0, (_last_ratelimit_reset - now_ts) + 1.0)
+
+    # 4. Fallback default
+    return default_wait
+
+def safe_get(
+    url: str,
+    params: Optional[Dict[str, Any]] = None,
+    timeout: int = 10,
+    max_retries: int = 3
+) -> Optional[requests.Response]:
+    """
+    Perform a GET request with intelligent 429 rate limit detection and backoff.
+    Inspects Retry-After and X-Ratelimit-Reset headers to automatically sleep
+    the required time before retrying.
+    """
+    global _last_ratelimit_reset
+
+    for attempt in range(max_retries + 1):
+        try:
+            response = _shared_session.get(url, params=params, timeout=timeout)
+            
+            # Save rate limit reset if provided in headers
+            reset_header = response.headers.get("X-Ratelimit-Reset")
+            if reset_header:
+                try:
+                    _last_ratelimit_reset = float(reset_header)
+                except ValueError:
+                    pass
+
+            if response.status_code == 429:
+                if attempt < max_retries:
+                    wait_time = extract_wait_time_from_response(response, default_wait=60.0)
+                    logger.warning(
+                        f"HTTP 429 (Rate Limit) al solicitar {url}. "
+                        f"Tiempo de espera indicado por HardGamers: {wait_time:.1f}s. "
+                        f"Pausando antes de reintentar (intento {attempt + 1}/{max_retries})..."
+                    )
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(f"HTTP 429 persistente tras {max_retries} reintentos para {url}.")
+                    return response
+
+            return response
+        except requests.RequestException as e:
+            if attempt < max_retries:
+                backoff = 2.0 * (attempt + 1)
+                logger.warning(f"Error de red ({e}) en {url}. Reintentando en {backoff:.1f}s...")
+                time.sleep(backoff)
+            else:
+                logger.error(f"Error de red definitivo para {url}: {e}")
+                return None
+
+    return None
 
 @dataclass
 class PriceHistory:
@@ -52,13 +150,21 @@ class Deal:
     product_link: str
     image_url: Optional[str]
     # Validation against other stores
+    search_keywords: Optional[str] = None
+    competitor_search_url: Optional[str] = None
     similar_found: bool = False
     competitors: List[Dict[str, Any]] = field(default_factory=list)
     min_competitor_price: Optional[float] = None
+    min_competitor_link: Optional[str] = None
     market_discount_percent: Optional[float] = None
     is_truly_cheaper: Optional[bool] = None
     # Price history validation (30 days)
     history: Optional[PriceHistory] = None
+
+@dataclass
+class RejectedDeal:
+    deal: Deal
+    reason: str
 
 def parse_price(price_str: Optional[str]) -> Optional[float]:
     """Parse price string like '$257.596' or '139031' into a float."""
@@ -86,11 +192,9 @@ def fetch_deals_page(page: int = 1, limit: int = 54) -> List[Deal]:
     params = {"page": page, "limit": limit}
 
     logger.info(f"Fetching HardGamers deals page {page} with limit {limit}...")
-    try:
-        response = _shared_session.get(url, params=params, timeout=10)
-        response.raise_for_status()
-    except requests.RequestException as e:
-        logger.error(f"HTTP request failed for page {page}: {e}")
+    response = safe_get(url, params=params, timeout=10)
+    if not response or response.status_code != 200:
+        logger.error(f"Failed to retrieve deals for page {page}.")
         return []
 
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -134,7 +238,7 @@ def fetch_deals_page(page: int = 1, limit: int = 54) -> List[Deal]:
                 image_url=image_url
             )
             deals.append(deal)
-        except Exception as e:
+        except Exception:
             continue
 
     return deals
@@ -159,19 +263,17 @@ def search_competitors(deal: Deal) -> List[Dict[str, Any]]:
     """Search HardGamers for other stores selling the same or similar product model."""
     tokens = [w for w in re.findall(r'[A-Za-z0-9]+', deal.title.upper()) if len(w) > 1 or w.isdigit()]
     if not tokens:
+        deal.search_keywords = ""
+        deal.competitor_search_url = ""
         return []
 
     query = ' '.join(tokens[:5])
+    deal.search_keywords = query
     url = f"https://www.hardgamers.com.ar/search?text={urllib.parse.quote(query)}"
+    deal.competitor_search_url = url
 
-    try:
-        response = _shared_session.get(url, timeout=8)
-        if response.status_code == 429:
-            logger.warning("Rate limit 429 encountered during competitor search.")
-            return []
-        response.raise_for_status()
-    except requests.RequestException as e:
-        logger.warning(f"Search request failed for '{query}': {e}")
+    response = safe_get(url, timeout=8)
+    if not response or response.status_code != 200:
         return []
 
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -191,6 +293,7 @@ def search_competitors(deal: Deal) -> List[Dict[str, Any]]:
             item_title = name_el.get_text(strip=True)
             item_store = store_el.get_text(strip=True)
             
+            # Exclude the store of the deal being analyzed
             if item_store.strip().lower() == deal.store.strip().lower():
                 continue
 
@@ -198,6 +301,10 @@ def search_competitors(deal: Deal) -> List[Dict[str, Any]]:
             price = parse_price(raw_price)
             if price is None or price <= 0:
                 continue
+
+            img_container = art.find("a", class_="img-container")
+            href = img_container.get("href") if img_container else ""
+            comp_link = f"https://www.hardgamers.com.ar{href}" if href.startswith("/") else href
 
             item_tokens = [w for w in re.findall(r'[A-Za-z0-9]+', item_title.upper()) if len(w) > 1 or w.isdigit()]
             item_tokens_set = set(item_tokens)
@@ -211,6 +318,7 @@ def search_competitors(deal: Deal) -> List[Dict[str, Any]]:
                     "store": item_store,
                     "title": item_title,
                     "price": price,
+                    "link": comp_link,
                     "similarity": round(max(token_ratio, seq_ratio), 2)
                 })
         except Exception:
@@ -222,14 +330,8 @@ def fetch_price_history(product_url: str) -> Optional[PriceHistory]:
     """
     Fetch the product detail page and extract the 30-day price history chart data from JS chartConfig.
     """
-    try:
-        response = _shared_session.get(product_url, timeout=8)
-        if response.status_code == 429:
-            logger.warning("Rate limit 429 encountered during price history fetch.")
-            return None
-        response.raise_for_status()
-    except requests.RequestException as e:
-        logger.warning(f"Failed to fetch product history page '{product_url}': {e}")
+    response = safe_get(product_url, timeout=8)
+    if not response or response.status_code != 200:
         return None
 
     soup = BeautifulSoup(response.text, 'html.parser')
