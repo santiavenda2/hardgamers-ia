@@ -13,11 +13,13 @@ Script en Python diseñado para monitorear la sección de ofertas ("deals") de [
 
 ## Arquitectura del Proyecto
 
-*   `scraper.py`: Realiza las solicitudes HTTP (`safe_get`) con manejo automático de *rate limiting* (HTTP 429), lectura de cabeceras `Retry-After` / `X-Ratelimit-Reset` y backoff inteligente. Extrae información de deals, competidores (con enlaces a productos) e historial de precios.
+*   `scraper.py`: Realiza las solicitudes HTTP (`safe_get`) con manejo automático de *rate limiting* (HTTP 429), lectura de cabeceras `Retry-After` / `X-Ratelimit-Reset` y backoff inteligente. 
+    * **Optimización de paginación temprana (*early exit*):** Dado que HardGamers entrega las ofertas ordenadas de mayor a menor descuento, el scraper interrumpe la recolección en cuanto encuentra un producto con un descuento menor al umbral configurado (`min_discount`), evitando peticiones HTTP innecesarias.
+    * Extrae datos del producto, historial de precios a 30 días y búsqueda de competidores con enlaces directos.
 *   `analyzer.py`: Lógica para filtrar las ofertas y detectar oportunidades reales. Realiza la validación profunda (competencia e historial de 30 días) de manera secuencial con pausas configurables para evitar sobrecargar la plataforma. Descarta automáticamente ofertas si la diferencia de precio frente a la competencia más barata no supera el 10%.
 *   `notifier.py`: Genera el cuerpo del email en formato HTML con la lista de ofertas seleccionadas, enlaces de búsqueda y a la competencia, y realiza el envío por SMTP.
 *   `main.py`: Orquestador que ejecuta el proceso completo de forma secuencial.
-*   `config.py`: Almacena credenciales SMTP y parámetros de configuración (delay entre peticiones, porcentaje mínimo de descuento, etc.).
+*   `config.py`: Almacena credenciales SMTP y parámetros de configuración con lectura segura de variables de entorno.
 
 ## Instalación y Configuración Local
 
@@ -48,8 +50,8 @@ uv run python main.py --include "monitor,lg" --exclude "switch" --sort-by market
 ```
 
 Opciones disponibles en CLI:
-* `--max-pages`: Número de páginas de ofertas a scrapear (por defecto: 1).
-* `--min-discount`: Porcentaje mínimo de descuento en tienda (por defecto: 30%).
+* `--max-pages`: Número máximo de páginas de ofertas a scrapear (por defecto: 10, con interrupción temprana automática al caer por debajo de `--min-discount`).
+* `--min-discount`: Porcentaje mínimo de descuento en tienda (por defecto: 20%).
 * `--min-competitor-discount`: Porcentaje mínimo de reducción requerido frente al vendedor competidor más barato (por defecto: 10%).
 * `--min-price-drop`: Rebaja mínima absoluta en ARS.
 * `--max-deals-to-validate`: Cantidad máxima de ofertas principales a validar profundamente en la red.

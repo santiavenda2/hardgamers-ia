@@ -15,9 +15,24 @@ logger = logging.getLogger(__name__)
 
 def main():
     parser = argparse.ArgumentParser(description="HardGamers Deals Scraper, Market & History Validator Agent")
-    parser.add_argument("--max-pages", type=int, default=1, help="Maximum number of deal pages to scrape")
-    parser.add_argument("--min-discount", type=int, default=30, help="Minimum discount percentage filter")
-    parser.add_argument("--min-price-drop", type=float, default=None, help="Minimum absolute price drop in ARS")
+    parser.add_argument(
+        "--max-pages", 
+        type=int, 
+        default=10, 
+        help="Maximum number of deal pages to scrape (default: 10, stops early when discount drops below min-discount)"
+    )
+    parser.add_argument(
+        "--min-discount", 
+        type=int, 
+        default=config.MIN_DISCOUNT_PERCENT, 
+        help=f"Minimum discount percentage filter (default: {config.MIN_DISCOUNT_PERCENT}%%)"
+    )
+    parser.add_argument(
+        "--min-price-drop", 
+        type=float, 
+        default=None, 
+        help="Minimum absolute price drop in ARS"
+    )
     parser.add_argument(
         "--min-competitor-discount",
         type=float,
@@ -54,8 +69,8 @@ def main():
 
     logger.info("Iniciando recolección, validación de mercado e historial de precios de HardGamers...")
 
-    # 1. Scrape deals
-    all_deals = fetch_all_deals(max_pages=args.max_pages)
+    # 1. Scrape deals with early-exit optimization based on sorted discounts
+    all_deals = fetch_all_deals(max_pages=args.max_pages, min_discount=args.min_discount)
     if not all_deals:
         logger.info("No se pudieron obtener ofertas. Finalizando.")
         return

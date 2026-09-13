@@ -115,7 +115,7 @@ def safe_get(
                     time.sleep(wait_time)
                     continue
                 else:
-                    logger.error(f"HTTP 429 persistente tras {max_retries} reintentos para {url}.")
+                    logger.error(f"HTTP 429 persistente tras {max_retries} reintentos para {url}.\")")
                     return response
 
             return response
@@ -243,17 +243,33 @@ def fetch_deals_page(page: int = 1, limit: int = 54) -> List[Deal]:
 
     return deals
 
-def fetch_all_deals(max_pages: int = 10) -> List[Deal]:
-    """Iterate through pagination pages until no more deals are found or max_pages is reached."""
+def fetch_all_deals(max_pages: int = 10, min_discount: Optional[int] = None) -> List[Deal]:
+    """
+    Iterate through pagination pages. Since HardGamers deals are sorted by discount descending,
+    scrapes deals page by page until no more deals are found, max_pages is reached,
+    or deals fall below min_discount (early stopping optimization).
+    """
     all_deals: List[Deal] = []
     page = 1
+    stop_early = False
 
-    while page <= max_pages:
+    while page <= max_pages and not stop_early:
         deals = fetch_deals_page(page=page)
         if not deals:
             logger.info(f"No deals found on page {page}. Stopping pagination.")
             break
-        all_deals.extend(deals)
+
+        for deal in deals:
+            if min_discount is not None and deal.discount_percent is not None and deal.discount_percent < min_discount:
+                logger.info(
+                    f"Alcanzado producto '{deal.title[:35]}' con descuento ({deal.discount_percent}% OFF) "
+                    f"inferior al mínimo buscado ({min_discount}% OFF). "
+                    f"Deteniendo paginación de forma anticipada en página {page}."
+                )
+                stop_early = True
+                break
+            all_deals.append(deal)
+
         page += 1
 
     logger.info(f"Successfully scraped a total of {len(all_deals)} deals across {page - 1} pages.")
