@@ -115,7 +115,7 @@ def safe_get(
                     time.sleep(wait_time)
                     continue
                 else:
-                    logger.error(f"HTTP 429 persistente tras {max_retries} reintentos para {url}.\")")
+                    logger.error(f"HTTP 429 persistente tras {max_retries} reintentos para {url}.")
                     return response
 
             return response
@@ -276,7 +276,11 @@ def fetch_all_deals(max_pages: int = 10, min_discount: Optional[int] = None) -> 
     return all_deals
 
 def search_competitors(deal: Deal) -> List[Dict[str, Any]]:
-    """Search HardGamers for other stores selling the same or similar product model."""
+    """
+    Search HardGamers for other stores selling the same or similar product model.
+    Since search results are sorted by price ascending (cheapest first),
+    the first valid competitor matching similarity criteria is the cheapest competitor.
+    """
     tokens = [w for w in re.findall(r'[A-Za-z0-9]+', deal.title.upper()) if len(w) > 1 or w.isdigit()]
     if not tokens:
         deal.search_keywords = ""
@@ -337,6 +341,9 @@ def search_competitors(deal: Deal) -> List[Dict[str, Any]]:
                     "link": comp_link,
                     "similarity": round(max(token_ratio, seq_ratio), 2)
                 })
+                # Optimization: HardGamers search results are sorted ascending by price.
+                # The first matching item is guaranteed to be the cheapest competitor.
+                break
         except Exception:
             continue
 
