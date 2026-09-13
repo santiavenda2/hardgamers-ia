@@ -1,3 +1,21 @@
+# IDEs
 .idea/
+.vscode/
+
+# Python & Environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+venv/
+
+# Environment Variables & Secrets
+.env
+.env.*
+*.local
+secrets.json
+
+# Planning
 .planning/
-__pycache__
