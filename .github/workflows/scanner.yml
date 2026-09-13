@@ -2,8 +2,8 @@ name: HardGamers Deals Scanner
 
 on:
   schedule:
-    # Se ejecuta todos los días a las 12:00 UTC (09:00 ART) y 21:00 UTC (18:00 ART)
-    - cron: '0 12,21 * * *'
+    # Se ejecuta todos los días a las 5:00 UTC (02:00 ART)
+    - cron: '0 5 * * *'
   workflow_dispatch:
     inputs:
       min_discount:
@@ -21,7 +21,7 @@ on:
       send_email:
         description: 'Enviar reporte por email'
         type: boolean
-        default: true
+        default: false
 
 jobs:
   scrape-and-analyze:
