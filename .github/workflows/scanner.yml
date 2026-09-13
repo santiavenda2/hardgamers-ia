@@ -1,0 +1,72 @@
+name: HardGamers Deals Scanner
+
+on:
+  schedule:
+    # Se ejecuta todos los días a las 12:00 UTC (09:00 ART) y 21:00 UTC (18:00 ART)
+    - cron: '0 12,21 * * *'
+  workflow_dispatch:
+    inputs:
+      min_discount:
+        description: 'Porcentaje mínimo de descuento (%)'
+        required: false
+        default: '30'
+      max_deals:
+        description: 'Máximo de ofertas principales a validar'
+        required: false
+        default: '50'
+      delay:
+        description: 'Delay en segundos entre peticiones'
+        required: false
+        default: '1.5'
+      send_email:
+        description: 'Enviar reporte por email'
+        type: boolean
+        default: true
+
+jobs:
+  scrape-and-analyze:
+    name: Scrape & Analyze Deals
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run Deals Scanner & Notifier
+        env:
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          REQUEST_DELAY_SECONDS: "1.5"
+          MIN_COMPETITOR_DISCOUNT_PERCENT: "10.0"
+        run: |
+          ARGS=""
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ inputs.send_email }}" = "false" ]; then
+              ARGS="$ARGS --no-email"
+            fi
+            if [ -n "${{ inputs.min_discount }}" ]; then
+              ARGS="$ARGS --min-discount ${{ inputs.min_discount }}"
+            fi
+            if [ -n "${{ inputs.max_deals }}" ]; then
+              ARGS="$ARGS --max-deals-to-validate ${{ inputs.max_deals }}"
+            fi
+            if [ -n "${{ inputs.delay }}" ]; then
+              ARGS="$ARGS --delay ${{ inputs.delay }}"
+            fi
+          fi
+
+          echo "Ejecutando: uv run python main.py $ARGS"
+          uv run python main.py $ARGS
