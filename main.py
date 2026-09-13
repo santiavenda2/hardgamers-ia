@@ -138,6 +138,8 @@ def main():
     # 5. Send notification email
     if args.no_email:
         logger.info("Modo dry-run activado (--no-email). Envío de email omitido.")
+    elif not config.is_email_configured():
+        logger.info("Configuración de email no proporcionada o incompleta. Envío de email omitido.")
     else:
         logger.info("Enviando reporte por email...")
         success = send_email_alert(sorted_deals, rejected_deals=rejected_deals)

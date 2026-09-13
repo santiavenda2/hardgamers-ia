@@ -94,9 +94,6 @@ def generate_html_email(deals: List[Deal], rejected_deals: Optional[List[Rejecte
             link_start = f"<a href='{d.product_link}' target='_blank' style='color: #495057; text-decoration: none; font-weight: 500;'>" if d.product_link else ""
             link_end = "</a>" if d.product_link else ""
 
-            # Convert plain URLs in reason to links if present
-            reason_text = item.reason
-
             rows_html += f"""
             <tr>
                 <td style="padding: 8px 10px; border-bottom: 1px solid #e9ecef; vertical-align: top;">
@@ -107,7 +104,7 @@ def generate_html_email(deals: List[Deal], rejected_deals: Optional[List[Rejecte
                     {link_start}{d.title}{link_end}
                 </td>
                 <td style="padding: 8px 10px; border-bottom: 1px solid #e9ecef; vertical-align: top;">
-                    <span class="reject-tag" style="word-break: break-all;">{reason_text}</span>
+                    <span class="reject-tag" style="word-break: break-all;">{item.reason}</span>
                 </td>
             </tr>
             """
@@ -332,9 +329,9 @@ def send_email_alert(deals: List[Deal], rejected_deals: Optional[List[RejectedDe
         logger.info("No deals or rejected items to send via email.")
         return True
 
-    if not config.SMTP_USER or not config.SMTP_PASSWORD or not config.EMAIL_TO:
-        logger.warning("SMTP credentials or recipient email are not configured. Skipping email send.")
-        return False
+    if not config.is_email_configured():
+        logger.info("Configuración SMTP no provista o incompleta. Envío de email omitido.")
+        return True
 
     deals_count_str = f"{len(deals)} Ofertas Verificadas" if deals else "Reporte de Análisis"
     subject = f"🔥 HardGamers Alert: {deals_count_str}!"
