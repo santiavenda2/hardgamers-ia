@@ -2,8 +2,8 @@ name: HardGamers Deals Scanner
 
 on:
   schedule:
-    # Se ejecuta todos los días a las 5:00 UTC (02:00 ART)
-    - cron: '0 5 * * *'
+    # Prueba temporal: se ejecutará a las 07:50 UTC
+    - cron: '50 8 * * *'
   workflow_dispatch:
     inputs:
       min_discount:
