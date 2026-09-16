@@ -67,6 +67,8 @@ def main():
 
     args = parser.parse_args()
 
+    logger.info(f"Args: {args}")
+
     logger.info("Iniciando recolección, validación de mercado e historial de precios de HardGamers...")
 
     # 1. Scrape deals with early-exit optimization based on sorted discounts

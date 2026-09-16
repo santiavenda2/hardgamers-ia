@@ -10,6 +10,7 @@ def validate_single_deal(deal: Deal) -> Deal:
     """
     Validate a single deal against market competitors and 30-day price history.
     """
+    logger.info(f"Validating deal: {deal.title}")
     # 1. Market Competitor Search
     try:
         competitors = search_competitors(deal)

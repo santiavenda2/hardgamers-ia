@@ -10,11 +10,13 @@ from difflib import SequenceMatcher
 from typing import List, Optional, Dict, Any
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, ResultSet, Tag
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
 import config
+
+SOURCE_HARDGAMERS = "hardgamers"
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +151,7 @@ class Deal:
     discount_percent: Optional[int]
     product_link: str
     image_url: Optional[str]
+    source: str
     # Validation against other stores
     search_keywords: Optional[str] = None
     competitor_search_url: Optional[str] = None
@@ -235,7 +238,8 @@ def fetch_deals_page(page: int = 1, limit: int = 54) -> List[Deal]:
                 previous_price=previous_price,
                 discount_percent=discount_percent,
                 product_link=product_link,
-                image_url=image_url
+                image_url=image_url,
+                source=SOURCE_HARDGAMERS,
             )
             deals.append(deal)
         except Exception:
@@ -281,27 +285,42 @@ def search_competitors(deal: Deal) -> List[Dict[str, Any]]:
     Since search results are sorted by price ascending (cheapest first),
     the first valid competitor matching similarity criteria is the cheapest competitor.
     """
-    tokens = [w for w in re.findall(r'[A-Za-z0-9]+', deal.title.upper()) if len(w) > 1 or w.isdigit()]
-    if not tokens:
+    product_type, product_model_tokens = extract_product_type_and_model(deal.title.upper())
+    if not product_model_tokens:
         deal.search_keywords = ""
         deal.competitor_search_url = ""
         return []
 
-    query = ' '.join(tokens[:5])
-    deal.search_keywords = query
-    url = f"https://www.hardgamers.com.ar/search?text={urllib.parse.quote(query)}"
-    deal.competitor_search_url = url
-
-    response = safe_get(url, timeout=8)
-    if not response or response.status_code != 200:
-        return []
-
-    soup = BeautifulSoup(response.text, 'html.parser')
-    articles = soup.find_all("article", class_="One-Bit-Product")
-    
-    deal_tokens_set = set(tokens)
     competitors = []
 
+    while len(product_model_tokens) > 2 and len(competitors) == 0:
+        # Busco productos similares usando el modelo, Si no encuentro voy quitando tokens del final del modelo
+        query = ' '.join(product_model_tokens)
+        deal.search_keywords = query
+        url = f"https://www.hardgamers.com.ar/search?text={urllib.parse.quote(query)}"
+        deal.competitor_search_url = url
+
+        response = safe_get(url, timeout=8)
+        if not response or response.status_code != 200:
+            return []
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        articles = soup.find_all("article", class_="One-Bit-Product")
+
+        deal_tokens_set = set(product_model_tokens)
+
+        current_competitors = find_competitors_on_similar_articles(articles, deal, deal_tokens_set)
+        if current_competitors:
+            logger.debug("Competitors found")
+            competitors.extend(current_competitors)
+        else:
+            product_model_tokens = product_model_tokens[:-1]
+
+    return competitors
+
+
+def find_competitors_on_similar_articles(articles: ResultSet[Tag], deal: Deal, deal_tokens_set: set[str]) -> list[dict]:
+    competitors = []
     for art in articles:
         try:
             name_el = art.find("p", class_="product-name")
@@ -312,7 +331,7 @@ def search_competitors(deal: Deal) -> List[Dict[str, Any]]:
 
             item_title = name_el.get_text(strip=True)
             item_store = store_el.get_text(strip=True)
-            
+
             # Exclude the store of the deal being analyzed
             if item_store.strip().lower() == deal.store.strip().lower():
                 continue
@@ -326,13 +345,13 @@ def search_competitors(deal: Deal) -> List[Dict[str, Any]]:
             href = img_container.get("href") if img_container else ""
             comp_link = f"https://www.hardgamers.com.ar{href}" if href.startswith("/") else href
 
-            item_tokens = [w for w in re.findall(r'[A-Za-z0-9]+', item_title.upper()) if len(w) > 1 or w.isdigit()]
-            item_tokens_set = set(item_tokens)
-            
+            item_type, item_model = extract_product_type_and_model(item_title.upper())
+            item_tokens_set = set(item_model)
+
             intersection = deal_tokens_set.intersection(item_tokens_set)
             token_ratio = len(intersection) / len(deal_tokens_set) if deal_tokens_set else 0.0
             seq_ratio = SequenceMatcher(None, deal.title.upper(), item_title.upper()).ratio()
-            
+
             if token_ratio >= 0.5 or seq_ratio >= 0.6:
                 competitors.append({
                     "store": item_store,
@@ -348,6 +367,24 @@ def search_competitors(deal: Deal) -> List[Dict[str, Any]]:
             continue
 
     return competitors
+
+
+def extract_product_type_and_model(deal_title: str) -> tuple[str, list[str]]:
+    """
+    Extract product type and model from the deal title.
+    En general en los productos de hardgamers la primera palabra del titulo es el tipo de producto (mouse, teclado, etc)
+    TODO: agregar un listado de tipos conocidos (incluyendo tipos de mas de una palabra, ejemplo, silla ergonomica) y
+    extraer estos tipos del titulo
+    :param deal_title: titulo del deal
+    :return: tipo de producto, listado de strings del modelo
+    """
+    deal_title = deal_title.upper()
+    tokens = [w for w in deal_title.split(" ") if len(w) > 1 and re.match(r"^[A-Za-z0-9\.\-]+$", w)]
+    # tokens = [w for w in re.findall(r'[A-Za-z0-9]+', deal_title) if len(w) > 1 or w.isdigit()]
+    product_type = tokens[0]
+    product_model = tokens[1:]
+    return product_type, product_model
+
 
 def fetch_price_history(product_url: str) -> Optional[PriceHistory]:
     """
@@ -416,3 +453,8 @@ def fetch_price_history(product_url: str) -> Optional[PriceHistory]:
         has_recent_price_increase=has_recent_increase,
         raw_history=raw_history
     )
+
+
+if __name__ == "__main__":
+    product_type, product_model = extract_product_type_and_model("ADAPTADOR TIPO C A PLUG 3.5 (H) OFF-ADA002 OFFICE")
+    print(product_type, product_model)
