@@ -44,7 +44,7 @@ def main():
     parser.add_argument(
         "--max-deals-to-validate", 
         type=int, 
-        default=50,
+        default=100,
         help="Maximum number of candidate deals to validate deep network requests for"
     )
     parser.add_argument(
@@ -63,7 +63,7 @@ def main():
 
     parser.add_argument("--no-validate-market", action="store_true", help="Skip searching and validating against other vendors")
     parser.add_argument("--no-email", action="store_true", help="Skip sending email notifications (dry run)")
-    parser.add_argument("--limit-output", type=int, default=10, help="Number of top deals to display in console")
+    parser.add_argument("--limit-output", type=int, default=50, help="Number of top deals to display in console")
 
     args = parser.parse_args()
 
