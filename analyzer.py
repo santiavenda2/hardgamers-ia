@@ -1,7 +1,8 @@
 import logging
 import time
 from typing import List, Optional, Tuple
-from scraper import Deal, RejectedDeal, search_competitors, fetch_price_history
+from scraper import HardgamersParser
+from models import Deal, RejectedDeal
 import config
 
 logger = logging.getLogger(__name__)
@@ -11,9 +12,10 @@ def validate_single_deal(deal: Deal) -> Deal:
     Validate a single deal against market competitors and 30-day price history.
     """
     logger.info(f"Validating deal: {deal.title}")
+    hardgamers_parser = HardgamersParser()
     # 1. Market Competitor Search
     try:
-        competitors = search_competitors(deal)
+        competitors = hardgamers_parser.search_competitors(deal)
         if competitors:
             competitors.sort(key=lambda x: x["price"])
             min_comp_price = competitors[0]["price"]
@@ -44,7 +46,7 @@ def validate_single_deal(deal: Deal) -> Deal:
     # 2. Fetch 30-day Price History
     try:
         time.sleep(0.2)
-        history = fetch_price_history(deal.product_link)
+        history = hardgamers_parser.fetch_price_history(deal.product_link)
         deal.history = history
     except Exception as e:
         logger.warning(f"History fetch failed for '{deal.title}': {e}")

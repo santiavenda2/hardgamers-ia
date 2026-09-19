@@ -3,7 +3,9 @@ from bs4 import BeautifulSoup
 import time
 import re
 import urllib.parse
-from scraper import parse_price, parse_discount, Deal
+from scraper import parse_price, parse_discount
+from models import Deal
+
 
 def run_limited_test():
     url = "https://www.hardgamers.com.ar/deals?page=1&limit=54"

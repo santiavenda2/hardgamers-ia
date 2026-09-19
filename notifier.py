@@ -3,7 +3,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import logging
 from typing import List, Optional
-from scraper import Deal, RejectedDeal
+from models import Deal, RejectedDeal
 import config
 
 logger = logging.getLogger(__name__)
