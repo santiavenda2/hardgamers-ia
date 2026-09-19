@@ -9,15 +9,15 @@ on:
       min_discount:
         description: 'Porcentaje mínimo de descuento (%)'
         required: false
-        default: '20'
+        default: '25'
       max_deals:
         description: 'Máximo de ofertas principales a validar'
         required: false
-        default: '100'
+        default: '250'
       delay:
         description: 'Delay en segundos entre peticiones'
         required: false
-        default: '1.5'
+        default: '1.0'
       send_email:
         description: 'Enviar reporte por email'
         type: boolean
