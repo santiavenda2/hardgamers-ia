@@ -84,24 +84,65 @@ jobs:
           name: today_deals.txt     # Nombre que tendrá el artefacto en GitHub
           path: today_deals.txt
 
-      - name: Preparar archivo Markdown
+      - name: Preparar archivo HTML desde Markdown
         run: |
           mkdir public
           
-          # Caso A: Si tu script ya genera un index.md
+          # Si tu script genera un index.md o ofertas.txt
+          CONTENT=""
           if [ -f index.md ]; then
-            cp index.md public/
-          # Caso B: Si tu script genera ofertas.txt, lo convertimos a Markdown envuelto
+            CONTENT=$(cat index.md)
           elif [ -f today_deals.txt ]; then
-            echo "# 🛒 Últimas Ofertas Encontradas" > public/index.md
-            echo "" >> public/index.md
-            echo "\`\`\`text" >> public/index.md
-            cat today_deals.txt >> public/index.md
-            echo "\`\`\`" >> public/index.md
-          else
-            echo "Error: No se encontró el archivo today_deals.txt de salida."
-            exit 1
+            CONTENT=$(cat today_deals.txt)
           fi
+
+          # Generamos un index.html con un estilo limpio de Markdown
+          cat << 'EOF' > public/index.html
+          <!DOCTYPE html>
+          <html lang="es">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Ofertas Hardgamers</title>
+            <!-- Cargamos estilos tipo GitHub para que el Markdown se vea bien -->
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.0/github-markdown.min.css">
+            <style>
+              body {
+                box-sizing: border-box;
+                min-width: 200px;
+                max-width: 980px;
+                margin: 0 auto;
+                padding: 45px;
+                background-color: #0d1117;
+              }
+              @media (max-width: 767px) {
+                body { padding: 15px; }
+              }
+            </style>
+          </head>
+          <body class="markdown-body" data-color-mode="dark" data-dark-theme="dark">
+            <div id="content"></div>
+            <!-- Script liviano para renderizar el Markdown automáticamente -->
+            <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+            <script>
+              const markdownText = `CONTENT_PLACEHOLDER`;
+              document.getElementById('content').innerHTML = marked.parse(markdownText);
+            </script>
+          </body>
+          </html>
+          EOF
+
+          # Reemplazamos el placeholder por el contenido real
+          python3 -c "
+          import sys
+          with open('public/index.html', 'r') as f:
+              html = f.read()
+          with open('index.md' if os.path.exists('index.md') else 'today_deals.txt', 'r') as f:
+              md = f.read()
+          html = html.replace('CONTENT_PLACEHOLDER', md.replace('`', '\\`'))
+          with open('public/index.html', 'w') as f:
+              f.write(html)
+          "
 
       - name: Subir artefacto para GitHub Pages
         uses: actions/upload-pages-artifact@v5
