@@ -96,6 +96,23 @@ def main():
         exclude_keywords=exclude_keywords
     )
 
+    display_deals_report(filtered_deals, rejected_deals)
+
+    # 5. Send notification email
+    if args.no_email:
+        logger.info("Modo dry-run activado (--no-email). Envío de email omitido.")
+    elif not config.is_email_configured():
+        logger.info("Configuración de email no proporcionada o incompleta. Envío de email omitido.")
+    else:
+        logger.info("Enviando reporte por email...")
+        success = send_email_alert(filtered_deals, rejected_deals=rejected_deals)
+        if success:
+            logger.info("Notificación enviada exitosamente.")
+        else:
+            logger.error("No se pudo enviar la notificación por correo.")
+
+
+def display_deals_report(filtered_deals: list[Deal], rejected_deals: list[RejectedDeal]):
     filtered_deals_with_competitor = []
     filtered_deals_without_competitor = []
     for deal in filtered_deals:
@@ -135,19 +152,6 @@ def main():
         for index, rejected in enumerate(rejected_deals, 1):
             print_rejected_deal(rejected, index)
         print_separator("=")
-
-    # 5. Send notification email
-    if args.no_email:
-        logger.info("Modo dry-run activado (--no-email). Envío de email omitido.")
-    elif not config.is_email_configured():
-        logger.info("Configuración de email no proporcionada o incompleta. Envío de email omitido.")
-    else:
-        logger.info("Enviando reporte por email...")
-        success = send_email_alert(filtered_deals, rejected_deals=rejected_deals)
-        if success:
-            logger.info("Notificación enviada exitosamente.")
-        else:
-            logger.error("No se pudo enviar la notificación por correo.")
 
 
 def print_separator(char="=", length=80, add_breakline=False):
