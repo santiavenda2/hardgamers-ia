@@ -12,9 +12,8 @@ class PriceHistory:
     has_recent_price_increase: bool = False
     raw_history: List[Dict[str, Any]] = field(default_factory=list)
 
-
 @dataclass
-class Deal:
+class Article:
     title: str
     store: str
     current_price: float
@@ -23,11 +22,15 @@ class Deal:
     product_link: str
     image_url: Optional[str]
     source: str
+
+
+@dataclass
+class Deal(Article):
     # Validation against other stores
     search_keywords: Optional[str] = None
     competitor_search_url: Optional[str] = None
     similar_found: bool = False
-    competitors: List[Dict[str, Any]] = field(default_factory=list)
+    competitors: List[Article] = field(default_factory=list)
     min_competitor_price: Optional[float] = None
     min_competitor_link: Optional[str] = None
     market_discount_percent: Optional[float] = None

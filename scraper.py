@@ -3,12 +3,12 @@ import logging
 import re
 import urllib.parse
 from difflib import SequenceMatcher
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 
 from bs4 import BeautifulSoup, ResultSet, Tag
 
 from http_client import create_session, safe_get
-from models import PriceHistory, Deal
+from models import PriceHistory, Deal, Article
 
 SOURCE_HARDGAMERS = "hardgamers"
 
@@ -36,41 +36,18 @@ class HardgamersParser:
         product_articles = soup.find_all("article", class_="One-Bit-Product")
 
         deals: List[Deal] = []
-        for article in product_articles:
+        for article_html in product_articles:
             try:
-                name_el = article.find("p", class_="product-name")
-                title = name_el.get_text(strip=True) if name_el else "Unknown Product"
-
-                store_el = article.find("p", class_="store")
-                store = store_el.get_text(strip=True) if store_el else "Unknown Store"
-
-                price_span = article.select_one("p.product-price span[itemprop='price']")
-                raw_current_price = price_span.get_text(strip=True) if price_span else None
-                if not raw_current_price and price_span:
-                    raw_current_price = price_span.get("content")
-                current_price = parse_price(raw_current_price) or 0.0
-
-                prev_price_el = article.find("p", class_="previous-price")
-                previous_price = parse_price(prev_price_el.get_text(strip=True)) if prev_price_el else None
-
-                offer_el = article.find("div", class_="offer")
-                discount_percent = parse_discount(offer_el.get_text(strip=True)) if offer_el else None
-
-                img_container = article.find("a", class_="img-container")
-                href = img_container.get("href") if img_container else ""
-                product_link = f"https://www.hardgamers.com.ar{href}" if href.startswith("/") else href
-
-                img_el = img_container.find("img", class_="img") if img_container else None
-                image_url = img_el.get("src") if img_el else None
+                article = parse_article(article_html)
 
                 deal = Deal(
-                    title=title,
-                    store=store,
-                    current_price=current_price,
-                    previous_price=previous_price,
-                    discount_percent=discount_percent,
-                    product_link=product_link,
-                    image_url=image_url,
+                    title=article.title,
+                    store=article.store,
+                    current_price=article.current_price,
+                    previous_price=article.previous_price,
+                    discount_percent=article.discount_percent,
+                    product_link=article.product_link,
+                    image_url=article.image_url,
                     source=SOURCE_HARDGAMERS,
                 )
                 deals.append(deal)
@@ -79,7 +56,7 @@ class HardgamersParser:
 
         return deals
 
-    def search_competitors(self, deal: Deal) -> List[Dict[str, Any]]:
+    def search_competitors(self, deal: Deal) -> List[Article]:
         """
         Search HardGamers for other stores selling the same or similar product model.
         Since search results are sorted by price ascending (cheapest first),
@@ -95,20 +72,11 @@ class HardgamersParser:
 
         while len(product_model_tokens) > 2 and len(competitors) == 0:
             # Busco productos similares usando el modelo, Si no encuentro voy quitando tokens del final del modelo
-            query = ' '.join(product_model_tokens)
-            deal.search_keywords = query
-            url = f"https://www.hardgamers.com.ar/search?text={urllib.parse.quote(query)}"
-            deal.competitor_search_url = url
+            articles, search_url, search_terms = self.search(search_terms=product_model_tokens)
 
-            response = safe_get(url, timeout=8, shared_session=self._shared_session)
-            if not response or response.status_code != 200:
-                return []
-
-            soup = BeautifulSoup(response.text, 'html.parser')
-            articles = soup.find_all("article", class_="One-Bit-Product")
-
+            deal.search_keywords = search_terms
+            deal.competitor_search_url = search_url
             deal_tokens_set = set(product_model_tokens)
-
             current_competitors = find_competitors_on_similar_articles(articles, deal, deal_tokens_set)
             if current_competitors:
                 logger.debug("Competitors found")
@@ -117,6 +85,18 @@ class HardgamersParser:
                 product_model_tokens = product_model_tokens[:-1]
 
         return competitors
+
+    def search(self, search_terms: list[str]) -> tuple[ResultSet[Tag], str, str]:
+        query = ' '.join(search_terms)
+        url = f"https://www.hardgamers.com.ar/search?text={urllib.parse.quote(query)}"
+
+        response = safe_get(url, timeout=8, shared_session=self._shared_session)
+        if not response or response.status_code != 200:
+            raise Exception("Error executing HardGamers search")
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        articles = soup.find_all("article", class_="One-Bit-Product")
+        return articles, url, query
 
     def fetch_price_history(self, product_url: str) -> Optional[PriceHistory]:
         """
@@ -241,47 +221,30 @@ def parse_discount(discount_str: Optional[str]) -> Optional[int]:
         return None
 
 
-def find_competitors_on_similar_articles(articles: ResultSet[Tag], deal: Deal, deal_tokens_set: set[str]) -> list[dict]:
+def find_competitors_on_similar_articles(articles: ResultSet[Tag], deal: Deal, deal_tokens_set: set[str]) -> list[Article]:
     competitors = []
     for art in articles:
         try:
-            name_el = art.find("p", class_="product-name")
-            store_el = art.find("p", class_="store")
-            price_span = art.select_one("p.product-price span[itemprop='price']")
-            if not name_el or not store_el or not price_span:
+            article = parse_article(art)
+            if not article.title or not article.store or not article.current_price:
                 continue
-
-            item_title = name_el.get_text(strip=True)
-            item_store = store_el.get_text(strip=True)
 
             # Exclude the store of the deal being analyzed
-            if item_store.strip().lower() == deal.store.strip().lower():
+            if article.store.lower() == deal.store.strip().lower():
                 continue
 
-            raw_price = price_span.get("content") or price_span.get_text(strip=True)
-            price = parse_price(raw_price)
-            if price is None or price <= 0:
+            if article.current_price is None or article.current_price <= 0:
                 continue
 
-            img_container = art.find("a", class_="img-container")
-            href = img_container.get("href") if img_container else ""
-            comp_link = f"https://www.hardgamers.com.ar{href}" if href.startswith("/") else href
+            item_type, item_model = extract_product_type_and_model(article.title.upper())
 
-            item_type, item_model = extract_product_type_and_model(item_title.upper())
             item_tokens_set = set(item_model)
-
             intersection = deal_tokens_set.intersection(item_tokens_set)
             token_ratio = len(intersection) / len(deal_tokens_set) if deal_tokens_set else 0.0
-            seq_ratio = SequenceMatcher(None, deal.title.upper(), item_title.upper()).ratio()
+            seq_ratio = SequenceMatcher(None, deal.title.upper(), article.title.upper()).ratio()
 
             if token_ratio >= 0.5 or seq_ratio >= 0.6:
-                competitors.append({
-                    "store": item_store,
-                    "title": item_title,
-                    "price": price,
-                    "link": comp_link,
-                    "similarity": round(max(token_ratio, seq_ratio), 2)
-                })
+                competitors.append(article)
                 # Optimization: HardGamers search results are sorted ascending by price.
                 # The first matching item is guaranteed to be the cheapest competitor.
                 break
@@ -290,6 +253,44 @@ def find_competitors_on_similar_articles(articles: ResultSet[Tag], deal: Deal, d
 
     return competitors
 
+
+def parse_article(article_html: Tag) -> Article:
+    name_el = article_html.find("p", class_="product-name")
+    title = name_el.get_text(strip=True) if name_el else "Unknown Product"
+
+    store_el = article_html.find("p", class_="store")
+    store = store_el.get_text(strip=True) if store_el else "Unknown Store"
+
+    price_span = article_html.select_one("p.product-price span[itemprop='price']")
+    raw_current_price = price_span.get_text(strip=True) if price_span else None
+    if not raw_current_price and price_span:
+        raw_current_price = price_span.get("content")
+    current_price = parse_price(raw_current_price) or 0.0
+
+    prev_price_el = article_html.find("p", class_="previous-price")
+    previous_price = parse_price(prev_price_el.get_text(strip=True)) if prev_price_el else None
+
+    offer_el = article_html.find("div", class_="offer")
+    discount_percent = parse_discount(offer_el.get_text(strip=True)) if offer_el else None
+
+    img_container = article_html.find("a", class_="img-container")
+    href = img_container.get("href") if img_container else ""
+    product_link = f"https://www.hardgamers.com.ar{href}" if href.startswith("/") else href
+
+    img_el = img_container.find("img", class_="img") if img_container else None
+    image_url = img_el.get("src") if img_el else None
+
+    article_html = Article(
+        title=title,
+        store=store,
+        current_price=current_price,
+        previous_price=previous_price,
+        discount_percent=discount_percent,
+        product_link=product_link,
+        image_url=image_url,
+        source=SOURCE_HARDGAMERS,
+    )
+    return article_html
 
 def extract_product_type_and_model(deal_title: str) -> tuple[str, list[str]]:
     """

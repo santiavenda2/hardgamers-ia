@@ -22,28 +22,28 @@ def generate_html_email(deals: List[Deal], rejected_deals: Optional[List[Rejecte
 
         # Competitor validation block
         if deal.similar_found and deal.competitors:
-            best_comp = deal.competitors[0]
-            comp_link_tag = f"<a href='{best_comp['link']}' target='_blank' style='color: inherit; text-decoration: underline; font-weight: bold;'>{best_comp['store']}</a>" if best_comp.get('link') else f"<strong>{best_comp['store']}</strong>"
+            best_competitor = deal.competitors[0]
+            comp_link_tag = f"<a href='{best_competitor.product_link}' target='_blank' style='color: inherit; text-decoration: underline; font-weight: bold;'>{best_competitor.store}</a>" if best_competitor.product_link else f"<strong>{best_competitor.store}</strong>"
 
             if deal.is_truly_cheaper and deal.market_discount_percent and deal.market_discount_percent > 0:
                 market_html = f"""
                 <div class='market-comparison market-cheaper'>
                     {search_link_html}
-                    ✅ <strong>¡Más barato que la competencia!</strong> {deal.market_discount_percent}% menos que {comp_link_tag} (${best_comp['price']:,.2f})
+                    ✅ <strong>¡Más barato que la competencia!</strong> {deal.market_discount_percent}% menos que {comp_link_tag} (${best_competitor.current_price:,.2f})
                 </div>
                 """
             elif deal.market_discount_percent is not None and deal.market_discount_percent <= 0:
                 market_html = f"""
                 <div class='market-comparison market-warning'>
                     {search_link_html}
-                    ⚠️ Encontrado más barato o igual en {comp_link_tag} (${best_comp['price']:,.2f})
+                    ⚠️ Encontrado más barato o igual en {comp_link_tag} (${best_competitor.current_price:,.2f})
                 </div>
                 """
             else:
                 market_html = f"""
                 <div class='market-comparison'>
                     {search_link_html}
-                    📊 Competidor más cercano: {comp_link_tag} (${best_comp['price']:,.2f})
+                    📊 Competidor más cercano: {comp_link_tag} (${best_competitor.current_price:,.2f})
                 </div>
                 """
         else:

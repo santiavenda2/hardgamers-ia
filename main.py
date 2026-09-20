@@ -207,17 +207,17 @@ def print_accepted_deal(deal: Deal, index: int, output_file):
         output_file.write(f"   🔍 Palabras clave búsqueda: '{deal.search_keywords}'\n")
 
     if deal.similar_found and deal.competitors:
-        best_comp = deal.competitors[0]
-        comp_link_str = f"\n      Link competidor: {best_comp.get('link')}" if best_comp.get("link") else ""
+        best_competitor = deal.competitors[0]
+        comp_link_str = f"\n      Link competidor: {best_competitor.product_link}" if best_competitor.product_link else ""
         if deal.is_truly_cheaper and deal.market_discount_percent and deal.market_discount_percent > 0:
             output_file.write(f"   ✅ COMPETENCIA: ¡Es {deal.market_discount_percent}% MÁS BARATO que la competencia!\n")
             output_file.write(
-                f"      Mejor competidor: [{best_comp['store']}] ${best_comp['price']:,.2f} ({best_comp['title'][:45]}...){comp_link_str}\n")
+                f"      Mejor competidor: [{best_competitor.store}] ${best_competitor.current_price:,.2f} ({best_competitor.title[:45]}...){comp_link_str}\n")
         elif deal.market_discount_percent is not None and deal.market_discount_percent <= 0:
             output_file.write(
-                f"   ⚠️ COMPETENCIA: Encontrado en [{best_comp['store']}] a ${best_comp['price']:,.2f}{comp_link_str}\n")
+                f"   ⚠️ COMPETENCIA: Encontrado en [{best_competitor.store}] a ${best_competitor.current_price:,.2f}{comp_link_str}\n")
         else:
-            output_file.write(f"   📊 Competidor más cercano: [{best_comp['store']}] ${best_comp['price']:,.2f}{comp_link_str}\n")
+            output_file.write(f"   📊 Competidor más cercano: [{best_competitor.store}] ${best_competitor.current_price:,.2f}{comp_link_str}\n")
     else:
         output_file.write("   ℹ️ COMPETENCIA: Sin productos similares encontrados en otras tiendas.\n")
 

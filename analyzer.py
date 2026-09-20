@@ -2,7 +2,7 @@ import logging
 import time
 from typing import List, Optional, Tuple
 from scraper import HardgamersParser
-from models import Deal, RejectedDeal
+from models import Deal, RejectedDeal, Article
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +14,11 @@ def validate_single_deal(deal: Deal) -> Deal:
     hardgamers_parser = HardgamersParser()
     # 1. Market Competitor Search
     try:
-        competitors = hardgamers_parser.search_competitors(deal)
+        competitors: list[Article] = hardgamers_parser.search_competitors(deal)
         if competitors:
-            competitors.sort(key=lambda x: x["price"])
-            min_comp_price = competitors[0]["price"]
-            min_comp_link = competitors[0].get("link")
+            competitors.sort(key=lambda a: a.current_price)
+            min_comp_price = competitors[0].current_price
+            min_comp_link = competitors[0].product_link
 
             deal.similar_found = True
             deal.competitors = competitors
@@ -155,21 +155,21 @@ def filter_deals(
 
             # Reject if competitor exists and deal reduction vs cheapest competitor is under min_competitor_discount (10%)
             if deal.similar_found and deal.competitors:
-                best_comp = deal.competitors[0]
+                best_competitor = deal.competitors[0]
                 market_disc = deal.market_discount_percent if deal.market_discount_percent is not None else 0.0
-                comp_link_info = f" | Link competidor: {best_comp.get('link')}" if best_comp.get("link") else ""
+                comp_link_info = f" | Link competidor: {best_competitor.product_link}" if best_competitor.product_link else ""
                 search_url_info = f" | Endpoint búsqueda: {deal.competitor_search_url}" if deal.competitor_search_url else ""
                 
                 if market_disc < min_competitor_discount:
                     if market_disc <= 0:
                         reason = (
-                            f"Competencia más barata o igual en [{best_comp['store']}] a ${best_comp['price']:,.2f}"
+                            f"Competencia más barata o igual en [{best_competitor.store}] a ${best_competitor.current_price:,.2f}"
                             f"{comp_link_info}{search_url_info}"
                         )
                     else:
                         reason = (
                             f"Reducción insuficiente frente a competencia ({market_disc:.1f}% < {min_competitor_discount:.1f}%). "
-                            f"Mejor competidor [{best_comp['store']}] a ${best_comp['price']:,.2f}"
+                            f"Mejor competidor [{best_competitor.store}] a ${best_competitor.current_price:,.2f}"
                             f"{comp_link_info}{search_url_info}"
                         )
                     rejected.append(RejectedDeal(deal=deal, reason=reason))
