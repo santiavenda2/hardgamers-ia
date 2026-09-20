@@ -18,7 +18,7 @@ Script en Python diseñado para monitorear la sección de ofertas ("deals") de [
     * Extrae datos del producto, historial de precios a 30 días y búsqueda de competidores con enlaces directos.
 *   `analyzer.py`: Lógica para filtrar las ofertas y detectar oportunidades reales. Realiza la validación profunda (competencia e historial de 30 días) de manera secuencial con pausas configurables para evitar sobrecargar la plataforma. Descarta automáticamente ofertas si la diferencia de precio frente a la competencia más barata no supera el 10%.
 *   `notifier.py`: Genera el cuerpo del email en formato HTML con la lista de ofertas seleccionadas, enlaces de búsqueda y a la competencia, y realiza el envío por SMTP.
-*   `main.py`: Orquestador que ejecuta el proceso completo de forma secuencial.
+* `deals_finder.py`: Orquestador que ejecuta el proceso completo de forma secuencial.
 *   `config.py`: Almacena credenciales SMTP y parámetros de configuración con lectura segura de variables de entorno.
 
 ## Instalación y Configuración Local
@@ -36,17 +36,17 @@ El proyecto está gestionado con [uv](https://github.com/astral-sh/uv).
 
 Ejecución básica (solo consola, validando Top 20):
 ```bash
-uv run python main.py --no-email --max-deals-to-validate 20
+uv run python deals_finder.py --no-email --max-deals-to-validate 20
 ```
 
 Personalizar el tiempo de espera entre análisis de artículos:
 ```bash
-uv run python main.py --delay 2.0 --max-deals-to-validate 30
+uv run python deals_finder.py --delay 2.0 --max-deals-to-validate 30
 ```
 
 Buscar solo monitores LG y excluir switches (con validación de mercado):
 ```bash
-uv run python main.py --include "monitor,lg" --exclude "switch" --sort-by market_discount
+uv run python deals_finder.py --include "monitor,lg" --exclude "switch" --sort-by market_discount
 ```
 
 Opciones disponibles en CLI:

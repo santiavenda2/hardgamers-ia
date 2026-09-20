@@ -115,7 +115,7 @@ Definidas en `config.py` con lectura mediante `os.environ`:
 
 ---
 
-## 6. Interfaz CLI (`main.py`)
+## 6. Interfaz CLI (`deals_finder.py`)
 
 | Argumento | Tipo | Default | Descripción |
 |---|---|---|---|
@@ -134,13 +134,13 @@ Definidas en `config.py` con lectura mediante `os.environ`:
 
 ```bash
 # Modo prueba sin enviar emails
-uv run main.py --no-email
+uv run deals_finder.py --no-email
 
 # Filtrar monitores con validación de mercado ordenados por ahorro real
-uv run main.py --include "monitor" --sort-by market_discount --no-email
+uv run deals_finder.py --include "monitor" --sort-by market_discount --no-email
 
 # Ejecución de producción recomendada (Top 15 ofertas verificadas)
-uv run main.py --max-pages 2 --min-discount 25 --max-deals-to-validate 15 --sort-by market_discount
+uv run deals_finder.py --max-pages 2 --min-discount 25 --max-deals-to-validate 15 --sort-by market_discount
 ```
 
 ---

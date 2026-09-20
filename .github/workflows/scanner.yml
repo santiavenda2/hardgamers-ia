@@ -75,8 +75,8 @@ jobs:
             fi
           fi
 
-          echo "Ejecutando: uv run python main.py $ARGS"
-          uv run python main.py $ARGS
+          echo "Ejecutando: uv run python deals_finder.py $ARGS"
+          uv run python deals_finder.py $ARGS
 
       - name: Subir el archivo de deals actuales
         uses: actions/upload-artifact@v7
