@@ -193,6 +193,7 @@ class HardgamersParser:
         scrapes deals page by page until no more deals are found, max_pages is reached,
         or deals fall below min_discount (early stopping optimization).
         """
+        logger.info(f"Fetching all Hardgamers deals (max pages: {max_pages})")
         all_deals: List[Deal] = []
         page = 1
         stop_early = False

@@ -53,7 +53,7 @@ jobs:
           REQUEST_DELAY_SECONDS: "1.5"
           MIN_COMPETITOR_DISCOUNT_PERCENT: "10.0"
         run: |
-          ARGS=""
+          ARGS="--output-file today_deals.txt"
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ "${{ inputs.send_email }}" = "false" ]; then
@@ -72,3 +72,9 @@ jobs:
 
           echo "Ejecutando: uv run python main.py $ARGS"
           uv run python main.py $ARGS
+
+      - name: Subir el archivo de deals actuales
+        uses: actions/upload-artifact@v7
+        with:
+          name: today_deals.txt     # Nombre que tendrá el artefacto en GitHub
+          path: today_deals.txt

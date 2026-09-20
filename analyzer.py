@@ -3,7 +3,6 @@ import time
 from typing import List, Optional, Tuple
 from scraper import HardgamersParser
 from models import Deal, RejectedDeal
-import config
 
 logger = logging.getLogger(__name__)
 
@@ -72,24 +71,10 @@ def filter_deals(
     - List of accepted/validated deals
     - List of rejected deals with their respective rejection reasons
     """
-    if min_discount is None:
-        min_discount = config.MIN_DISCOUNT_PERCENT
-    if min_price_drop is None:
-        min_price_drop = config.MIN_PRICE_DROP_ARS
-    if min_competitor_discount is None:
-        min_competitor_discount = config.MIN_COMPETITOR_DISCOUNT_PERCENT
-    if delay_between_deals is None:
-        delay_between_deals = config.REQUEST_DELAY_SECONDS
-    if include_keywords is None:
-        include_keywords = [k.strip() for k in config.INCLUDE_KEYWORDS.split(",") if k.strip()] if config.INCLUDE_KEYWORDS else []
-    else:
+    if include_keywords:
         include_keywords = [k.strip() for k in include_keywords if k.strip()]
-        
-    if exclude_keywords is None:
-        exclude_keywords = [k.strip() for k in config.EXCLUDE_KEYWORDS.split(",") if k.strip()] if config.EXCLUDE_KEYWORDS else []
-    else:
+    if exclude_keywords:
         exclude_keywords = [k.strip() for k in exclude_keywords if k.strip()]
-
     candidates: List[Deal] = []
     rejected: List[RejectedDeal] = []
 

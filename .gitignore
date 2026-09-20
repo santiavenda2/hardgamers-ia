@@ -19,3 +19,6 @@ secrets.json
 
 # Planning
 .planning/
+
+# AI agents
+.agents
