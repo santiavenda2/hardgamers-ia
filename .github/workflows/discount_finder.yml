@@ -4,6 +4,12 @@ on:
   schedule:
     # Se ejeuta todas las horas en minuto 60
     - cron: '50 * * * *'
+  workflow_dispatch:
+    inputs:
+      send_email:
+        description: 'Enviar reporte por email'
+        type: boolean
+        default: false
 
 jobs:
   find-discounts:
