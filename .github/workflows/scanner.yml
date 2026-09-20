@@ -78,3 +78,31 @@ jobs:
         with:
           name: today_deals.txt     # Nombre que tendrá el artefacto en GitHub
           path: today_deals.txt
+
+      - name: Preparar archivo Markdown
+        run: |
+          mkdir public
+          
+          # Caso A: Si tu script ya genera un index.md
+          if [ -f index.md ]; then
+            cp index.md public/
+          # Caso B: Si tu script genera ofertas.txt, lo convertimos a Markdown envuelto
+          elif [ -f today_deals.txt ]; then
+            echo "# 🛒 Últimas Ofertas Encontradas" > public/index.md
+            echo "" >> public/index.md
+            echo "\`\`\`text" >> public/index.md
+            cat today_deals.txt >> public/index.md
+            echo "\`\`\`" >> public/index.md
+          else
+            echo "Error: No se encontró el archivo today_deals.txt de salida."
+            exit 1
+          fi
+
+      - name: Subir artefacto para GitHub Pages
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: './public'
+
+      - name: Desplegar a GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5.0.1
