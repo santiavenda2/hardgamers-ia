@@ -86,9 +86,13 @@ class HardgamersParser:
 
         return competitors
 
-    def search(self, search_terms: list[str]) -> tuple[ResultSet[Tag], str, str]:
-        query = ' '.join(search_terms)
-        url = f"https://www.hardgamers.com.ar/search?text={urllib.parse.quote(query)}"
+    def search(self, search_terms: list[str], min_price: Optional[int] = None, max_price: Optional[int] = None) -> tuple[ResultSet[Tag], str, str]:
+        search_terms = ' '.join(search_terms)
+        url = f"https://www.hardgamers.com.ar/search?text={urllib.parse.quote(search_terms)}"
+        if min_price:
+            url += f"&minPrice={min_price}"
+        if max_price:
+            url += f"&maxPrice={max_price}"
 
         response = safe_get(url, timeout=8, shared_session=self._shared_session)
         if not response or response.status_code != 200:
@@ -96,7 +100,7 @@ class HardgamersParser:
 
         soup = BeautifulSoup(response.text, 'html.parser')
         articles = soup.find_all("article", class_="One-Bit-Product")
-        return articles, url, query
+        return articles, url, search_terms
 
     def fetch_price_history(self, product_url: str) -> Optional[PriceHistory]:
         """

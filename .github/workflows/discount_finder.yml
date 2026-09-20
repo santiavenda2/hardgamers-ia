@@ -1,0 +1,32 @@
+name: HardGamers Deals Scanner
+
+on:
+  schedule:
+    # Se ejeuta todas las horas en minuto 60
+    - cron: '50 * * * *'
+
+jobs:
+  find-discounts:
+    name: Find target prices for products
+    runs-on: ubuntu-latest
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Find discount on target products
+        run: |
+          ARGS=""
+
+          echo "Ejecutando: uv run python discount_finder.py $ARGS"
+          uv run python discount_finder.py $ARGS
