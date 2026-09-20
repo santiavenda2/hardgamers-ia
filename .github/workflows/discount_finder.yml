@@ -1,4 +1,4 @@
-name: HardGamers Deals Scanner
+name: Find discounts for products
 
 on:
   schedule:
