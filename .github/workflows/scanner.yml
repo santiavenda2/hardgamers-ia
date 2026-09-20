@@ -135,6 +135,7 @@ jobs:
           # Reemplazamos el placeholder por el contenido real
           python3 -c "
           import sys
+          import os
           with open('public/index.html', 'r') as f:
               html = f.read()
           with open('index.md' if os.path.exists('index.md') else 'today_deals.txt', 'r') as f:
