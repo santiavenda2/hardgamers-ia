@@ -33,6 +33,7 @@ class HardgamersParser:
             return []
 
         soup = BeautifulSoup(response.text, 'html.parser')
+        self.remove_offers_div(soup)
         product_articles = soup.find_all("article", class_="One-Bit-Product")
 
         deals: List[Deal] = []
@@ -99,12 +100,15 @@ class HardgamersParser:
             raise Exception("Error executing HardGamers search")
 
         soup = BeautifulSoup(response.text, 'html.parser')
+        self.remove_offers_div(soup)
+        articles = soup.find_all("article", class_="One-Bit-Product")
+        return articles, url, search_terms
+
+    def remove_offers_div(self, soup: BeautifulSoup):
         # Remove offers div
         div_to_remove = soup.find("div", class_="Offers")
         if div_to_remove:
             div_to_remove.decompose()
-        articles = soup.find_all("article", class_="One-Bit-Product")
-        return articles, url, search_terms
 
     def fetch_price_history(self, product_url: str) -> Optional[PriceHistory]:
         """
