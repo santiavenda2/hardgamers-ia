@@ -99,6 +99,10 @@ class HardgamersParser:
             raise Exception("Error executing HardGamers search")
 
         soup = BeautifulSoup(response.text, 'html.parser')
+        # Remove offers div
+        div_to_remove = soup.find("div", class_="Offers")
+        if div_to_remove:
+            div_to_remove.decompose()
         articles = soup.find_all("article", class_="One-Bit-Product")
         return articles, url, search_terms
 
