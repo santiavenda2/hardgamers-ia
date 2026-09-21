@@ -43,3 +43,10 @@ class Deal(Article):
 class RejectedDeal:
     deal: Deal
     reason: str
+
+
+@dataclass
+class ProductWithTargetPrice:
+    keywords: list[str]
+    target_price: float
+    exact : Optional[bool] = False

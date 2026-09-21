@@ -2,8 +2,8 @@ name: Find discounts for products
 
 on:
   schedule:
-    # Se ejeuta todas las horas en minuto 60
-    - cron: '50 * * * *'
+    # cada 6 horas, en el minuto 43
+    - cron: '43 */6 * * *'
   workflow_dispatch:
     inputs:
       send_email:
