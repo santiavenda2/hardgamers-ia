@@ -56,6 +56,7 @@ if __name__ == "__main__":
         ProductWithTargetPrice(keywords=["32GS85Q"], target_price=730_000),
         ProductWithTargetPrice(keywords=["LOGITECH", "MX KEYS S"], target_price=165_000, exact=True),
         ProductWithTargetPrice(keywords=["LOGITECH", "BRIO 100"], target_price=50_000),
+        ProductWithTargetPrice(keywords=["CORSAIR", "5000D"], target_price=170_000),
     ]
     products_with_target_price_by_product_identifier = find_discount_for_multiple_products(
         product_identifiers_and_target_price=product_identifiers_and_target_price)

@@ -1,12 +1,14 @@
-# HardGamers Deals Scraper & Market Validator Agent (`AGENT.md`)
+# Hardware Deals Finder & Market Validator Agent (`AGENT.md`)
 
-Este documento sirve como guía técnica y de arquitectura para agentes de inteligencia artificial y desarrolladores que operen, mantengan o extiendan este proyecto.
+Este documento sirve como guía técnica y de arquitectura para agentes de inteligencia artificial y desarrolladores 
+que operen, mantengan o extiendan este proyecto.
 
 ---
 
 ## 1. Misión y Propósito del Agente
 
-El objetivo principal de este agente es **monitorear, auditar y reportar ofertas de hardware en Argentina** obtenidas desde la plataforma [HardGamers](https://www.hardgamers.com.ar).
+El objetivo principal de este agente es **monitorear, auditar y reportar ofertas de hardware en Argentina** 
+obtenidas desde diferentes plataformas.
 
 A diferencia de un scraper tradicional que solo extrae datos de la sección de descuentos, este agente:
 1. **Scrapea** las páginas de ofertas (`/deals`).

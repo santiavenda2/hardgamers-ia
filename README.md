@@ -1,6 +1,8 @@
-# HardGamers Deals Scraper
+# Hardia Hardware finder
 
-Script en Python diseñado para monitorear la sección de ofertas ("deals") de [HardGamers](https://www.hardgamers.com.ar/deals), analizar las publicaciones para identificar ofertas reales frente a la competencia e historial de precios de 30 días, y enviar un reporte periódico por correo electrónico o consultar los resultados en consola.
+Script en Python diseñado para monitorear la sección de ofertas de paginas de venta de Hrdware, analizar 
+las publicaciones para identificar ofertas reales frente a la competencia e historial de precios de 30 días, 
+y enviar un reporte periódico por correo electrónico o consultar los resultados en consola.
 
 ## Requisitos Técnicos
 
@@ -13,8 +15,7 @@ Script en Python diseñado para monitorear la sección de ofertas ("deals") de [
 
 ## Arquitectura del Proyecto
 
-*   `scraper.py`: Realiza las solicitudes HTTP (`safe_get`) con manejo automático de *rate limiting* (HTTP 429), lectura de cabeceras `Retry-After` / `X-Ratelimit-Reset` y backoff inteligente. 
-    * **Optimización de paginación temprana (*early exit*):** Dado que HardGamers entrega las ofertas ordenadas de mayor a menor descuento, el scraper interrumpe la recolección en cuanto encuentra un producto con un descuento menor al umbral configurado (`min_discount`), evitando peticiones HTTP innecesarias.
+*   `scraper.py`: Realiza las solicitudes HTTP (`safe_get`) con manejo automático de *rate limiting* (HTTP 429), lectura de cabeceras `Retry-After` / `X-Ratelimit-Reset` y backoff inteligente.
     * Extrae datos del producto, historial de precios a 30 días y búsqueda de competidores con enlaces directos.
 *   `analyzer.py`: Lógica para filtrar las ofertas y detectar oportunidades reales. Realiza la validación profunda (competencia e historial de 30 días) de manera secuencial con pausas configurables para evitar sobrecargar la plataforma. Descarta automáticamente ofertas si la diferencia de precio frente a la competencia más barata no supera el 10%.
 *   `notifier.py`: Genera el cuerpo del email en formato HTML con la lista de ofertas seleccionadas, enlaces de búsqueda y a la competencia, y realiza el envío por SMTP.
