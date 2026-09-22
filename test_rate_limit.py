@@ -1,9 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
-import time
 import re
 import urllib.parse
-from scraper import parse_price, parse_discount
+from hardgamers_scraper import parse_discount
 from models import Deal
 
 

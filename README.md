@@ -15,7 +15,7 @@ y enviar un reporte periódico por correo electrónico o consultar los resultado
 
 ## Arquitectura del Proyecto
 
-*   `scraper.py`: Realiza las solicitudes HTTP (`safe_get`) con manejo automático de *rate limiting* (HTTP 429), lectura de cabeceras `Retry-After` / `X-Ratelimit-Reset` y backoff inteligente.
+* `hardgamers_scraper.py`: Realiza las solicitudes HTTP (`safe_get`) con manejo automático de *rate limiting* (HTTP 429), lectura de cabeceras `Retry-After` / `X-Ratelimit-Reset` y backoff inteligente.
     * Extrae datos del producto, historial de precios a 30 días y búsqueda de competidores con enlaces directos.
 *   `analyzer.py`: Lógica para filtrar las ofertas y detectar oportunidades reales. Realiza la validación profunda (competencia e historial de 30 días) de manera secuencial con pausas configurables para evitar sobrecargar la plataforma. Descarta automáticamente ofertas si la diferencia de precio frente a la competencia más barata no supera el 10%.
 *   `notifier.py`: Genera el cuerpo del email en formato HTML con la lista de ofertas seleccionadas, enlaces de búsqueda y a la competencia, y realiza el envío por SMTP.

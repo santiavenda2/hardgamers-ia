@@ -2,7 +2,7 @@ import logging
 import sys
 
 from models import Article, ProductWithTargetPrice
-from scraper import HardgamersParser, parse_article
+from hardgamers_scraper import HardgamersScraper
 
 logging.basicConfig(
     level=logging.INFO,
@@ -12,25 +12,25 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def find_discount_for_multiple_products(product_identifiers_and_target_price: list[ProductWithTargetPrice]) -> dict[str, list[Article]]:
-    hardgamers_parser = HardgamersParser()
+    hardgamers_scraper = HardgamersScraper()
     products_with_target_price_by_product_identifier = {}
     for product_with_target_price in product_identifiers_and_target_price:
-        articles_with_target_price, query = find_discount_for_product(product_with_target_price, hardgamers_parser)
+        articles_with_target_price, query = find_discount_for_product(product_with_target_price, hardgamers_scraper)
         if articles_with_target_price:
             products_with_target_price_by_product_identifier[query] = articles_with_target_price
 
     return products_with_target_price_by_product_identifier
 
 
-def find_discount_for_product(product_with_target_price: ProductWithTargetPrice, hardgamers_parser: HardgamersParser) -> tuple[
+def find_discount_for_product(product_with_target_price: ProductWithTargetPrice, hardgamers_scraper: HardgamersScraper) -> tuple[
     list[Article], str]:
     logger.info(f"Searching discount for {product_with_target_price.keywords} (target price: {product_with_target_price.target_price})")
-    articles, url, query = hardgamers_parser.search(product_with_target_price.keywords, max_price=int(product_with_target_price.target_price))
+    articles, url, query = hardgamers_scraper.search(product_with_target_price.keywords, max_price=int(product_with_target_price.target_price))
 
     articles_with_target_price = []
 
     for article_html in articles:
-        article = parse_article(article_html)
+        article = hardgamers_scraper.parse_article(article_html)
         if product_with_target_price.exact:
             all_keywords_in_title = True
             for keyword in product_with_target_price.keywords:
@@ -53,7 +53,8 @@ def find_discount_for_product(product_with_target_price: ProductWithTargetPrice,
 if __name__ == "__main__":
     product_identifiers_and_target_price = [
         ProductWithTargetPrice(keywords=["274QPF"], target_price=510_000),
-        ProductWithTargetPrice(keywords=["32GS85Q"], target_price=730_000),
+        ProductWithTargetPrice(keywords=["27GS85Q"], target_price=630_000),
+        ProductWithTargetPrice(keywords=["32GS85Q"], target_price=700_000),
         ProductWithTargetPrice(keywords=["LOGITECH", "MX KEYS S"], target_price=160_000, exact=True),
         ProductWithTargetPrice(keywords=["LOGITECH", "BRIO 100"], target_price=50_000),
         ProductWithTargetPrice(keywords=["CORSAIR", "5000D"], target_price=170_000),

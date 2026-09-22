@@ -1,7 +1,7 @@
 import logging
 import time
 from typing import List, Optional, Tuple
-from scraper import HardgamersParser
+from hardgamers_scraper import HardgamersScraper
 from models import Deal, RejectedDeal, Article
 
 logger = logging.getLogger(__name__)
@@ -11,7 +11,7 @@ def validate_single_deal(deal: Deal) -> Deal:
     Validate a single deal against market competitors and 30-day price history.
     """
     logger.info(f"Validating deal: {deal.title}")
-    hardgamers_parser = HardgamersParser()
+    hardgamers_parser = HardgamersScraper()
     # 1. Market Competitor Search
     try:
         competitors: list[Article] = hardgamers_parser.search_competitors(deal)

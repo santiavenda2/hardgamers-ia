@@ -35,7 +35,7 @@ hardgamers-ia/
 └── uv.lock                   # Lockfile de dependencias
 ```
 
-### Modelos de Datos (`scraper.py`)
+### Modelos de Datos (`hardgamers_scraper.py`)
 
 - **`Deal`**: Representa una oferta individual:
   - `title`, `store`, `current_price`, `previous_price`, `discount_percent`, `product_link`, `image_url`
@@ -154,4 +154,4 @@ Al trabajar en este repositorio, sigue las siguientes reglas:
 1. **Gestor de paquetes `uv`**: Utiliza siempre `uv run <comando>` o `uv sync`. No invoques `pip` directamente a menos que sea necesario.
 2. **Respeto a Rate Limits**: No aumentes masivamente el número de hilos concurrentes en `analyzer.py` ni elimines el límite `max_deals_to_validate` sin añadir mecanismos de throttling/cache, ya que HardGamers bloqueará las peticiones con código `429 Too Many Requests`.
 3. **Robustez en Parsing de HTML/JS**: Los elementos HTML de HardGamers (`One-Bit-Product`, `p.product-price`, `chartConfig`) pueden cambiar su estructura. Mantén siempre bloques `try/except` defensivos y fallbacks.
-4. **Manejo de Moneda y Formato**: En Argentina los precios usan punto como separador de miles y coma como separador de decimales (`$257.596` o `$1.234,50`). Usa siempre `parse_price()` en `scraper.py`.
+4. **Manejo de Moneda y Formato**: En Argentina los precios usan punto como separador de miles y coma como separador de decimales (`$257.596` o `$1.234,50`). Usa siempre `parse_price()` en `hardgamers_scraper.py`.

@@ -5,7 +5,7 @@ from datetime import datetime
 from io import TextIOWrapper
 
 import config
-from scraper import HardgamersParser
+from hardgamers_scraper import HardgamersScraper
 from models import Deal, RejectedDeal
 from analyzer import filter_deals, sort_deals
 from notifier import send_email_alert
@@ -76,7 +76,7 @@ def main():
 
     logger.info("Iniciando recolección, validación de mercado e historial de precios de HardGamers...")
 
-    hardgamers_parser = HardgamersParser()
+    hardgamers_parser = HardgamersScraper()
     start_time = datetime.now()
     # 1. Scrape deals with early-exit optimization based on sorted discounts
     all_deals = hardgamers_parser.fetch_all_deals(max_pages=args.max_pages, min_discount=args.min_discount)
